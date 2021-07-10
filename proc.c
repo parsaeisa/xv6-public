@@ -96,6 +96,8 @@ found:
   p->rtime = 0;
   p->iotime = 0;
   p->priority = 60;
+  p->hassamepriority = 0;
+  p->prioritychanged = 0;
 
   release(&ptable.lock);
 
@@ -291,6 +293,7 @@ set_priority(int priority){
   struct proc *curproc = myproc();
   int prev_priority = curproc->priority;
   curproc->priority = priority;
+  curproc->prioritychanged = 1;
   return prev_priority;
 }
 
@@ -347,7 +350,7 @@ wait(void)
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
 void
-scheduler(void)
+schedulermain(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
@@ -379,6 +382,62 @@ scheduler(void)
     }
     release(&ptable.lock);
 
+  }
+}
+
+
+void
+scheduler(void)
+{
+  struct proc *p;  
+  int minpriority, hassamepriority;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+
+  for(;;){
+    hassamepriority = 0;
+    minpriority = 101;
+    sti();
+    acquire(&ptable.lock);
+    // cprintf("xxx") ;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if (p->priority < minpriority)     
+      {         
+        minpriority = p->priority ; 
+        hassamepriority =0 ;
+      }
+      else if (p->priority == minpriority)
+        hassamepriority = 1;           
+    }
+    
+    //if(minpriority < 101)
+      //cprintf("yyy %d " , minpriority) ;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if(p->state != RUNNABLE)
+        continue;    
+
+      if(p -> priority != minpriority)
+        continue ;
+
+      cprintf("pid:%d pri:%d has:%d chng:%d\n", p->pid, p->priority, p->hassamepriority, p->prioritychanged);
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      p->hassamepriority = hassamepriority;
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+      c->proc = 0;
+
+      p->hassamepriority = 0;
+      p->prioritychanged = 0;
+      if(p -> priority < minpriority)
+        break ;
+    }
+
+    release(&ptable.lock);
   }
 }
 
