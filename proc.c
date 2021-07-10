@@ -89,6 +89,14 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  // acquire(&tickslock);
+  p->stime = ticks;
+  // release(&tickslock);
+  p->etime = 0;
+  p->rtime = 0;
+  p->iotime = 0;
+  p->priority = 60;
+
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -260,11 +268,30 @@ exit(void)
         wakeup1(initproc);
     }
   }
-
+  // acquire(&tickslock);
+  curproc->etime = ticks ;
+  // release(&tickslock);
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
   panic("zombie exit");
+}
+
+int
+waitx(int *wtime, int *rtime)
+{
+  struct proc *curproc = myproc();
+  *wtime = curproc -> iotime ;
+  *rtime = curproc -> rtime ;
+  return 0;
+}
+
+int
+set_priority(int priority){
+  struct proc *curproc = myproc();
+  int prev_priority = curproc->priority;
+  curproc->priority = priority;
+  return prev_priority;
 }
 
 // Wait for a child process to exit and return its pid.
@@ -438,6 +465,9 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  // acquire(&tickslock);
+  p->sleepstarttime = ticks;
+  // release(&tickslock);
 
   sched();
 
@@ -459,9 +489,13 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
+  // acquire(&tickslock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
+      p->iotime += ticks - p->sleepstarttime;
       p->state = RUNNABLE;
+    }
+  // release(&tickslock);
 }
 
 // Wake up all processes sleeping on chan.

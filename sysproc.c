@@ -36,6 +36,29 @@ sys_kill(void)
   return kill(pid);
 }
 
+int 
+sys_waitx (void)
+{
+  int *rtime;
+  int *wtime;
+
+  if (argptr(0 , (void*) &wtime , sizeof(*wtime)) < 0)
+    return -1 ;
+  if(argptr(1 , (void*) &rtime , sizeof(*rtime)) < 0)
+    return -1 ;
+
+  return waitx (wtime , rtime);
+}
+
+int
+sys_set_priority(void)
+{
+  int priority;
+  if(argint(0, &priority) < 0)
+    return -1;
+  return set_priority(priority);
+}
+
 int
 sys_getpid(void)
 {
