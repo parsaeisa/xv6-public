@@ -55,7 +55,7 @@ trap(struct trapframe *tf)
         myproc()->rtime++;        
       }
 
-      if(ticks %200 == 0)
+      if(ticks %40 == 0)
         reset();
 
       wakeup(&ticks);
