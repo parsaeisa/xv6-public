@@ -58,6 +58,7 @@ struct proc {
   int priority;
   int hassamepriority;
   int prioritychanged;
+  int queue_num;
 };
 
 // Process memory is laid out contiguously, low addresses first:

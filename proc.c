@@ -10,6 +10,7 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  int queue_counts[4];
 } ptable;
 
 static struct proc *initproc;
@@ -24,6 +25,48 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  acquire(&ptable.lock);
+  for(int i = 0; i < 4; i++)
+    ptable.queue_counts[i] = 0;
+  release(&ptable.lock);
+}
+
+void update_queue_counts(int *queue_num)
+{
+  // if(*queue_num == 3)
+  //   *queue_num = 0;
+  // (*queue_num)++;
+  // ptable.queue_counts[*queue_num]++;
+  if (*queue_num < 3)
+    (*queue_num)++;
+  
+  ptable.queue_counts[*queue_num]++;
+    // if(*queue_num != 0)
+    //   ptable.queue_counts[*queue_num]--;
+    
+}
+
+void reset ()
+{
+  acquire(&ptable.lock);
+  cprintf("Priority queues reset.\n") ;
+  struct proc *p;
+  
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->queue_num != 3)
+      continue;
+
+    if(p-> state == RUNNABLE){
+      p->queue_num = 1 ;      
+      ptable.queue_counts[1] ++ ;
+    }
+    else
+      p->queue_num = 0 ;
+  }
+  ptable.queue_counts[3] = 0;
+
+  release(&ptable.lock);
 }
 
 // Must be called with interrupts disabled
@@ -98,8 +141,9 @@ found:
   p->priority = 60;
   p->hassamepriority = 0;
   p->prioritychanged = 0;
+  p->queue_num = 0;
 
-  release(&ptable.lock);
+release(&ptable.lock);
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
@@ -159,6 +203,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  update_queue_counts(&(p->queue_num));
 
   release(&ptable.lock);
 }
@@ -225,6 +270,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  update_queue_counts(&(np->queue_num)); 
 
   release(&ptable.lock);
 
@@ -421,7 +467,7 @@ schedulermain(void)
 
 
 void
-scheduler(void)
+scheduler2(void)
 {
   struct proc *p;  
   int minpriority, hassamepriority;
@@ -479,6 +525,76 @@ scheduler(void)
   }
 }
 
+void
+scheduler(void)
+{
+  struct proc *p;  
+  struct proc *mincpuproc;  
+  int min_queue, q;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+
+  for(;;){
+    sti();
+    
+    acquire(&ptable.lock);    
+    for (min_queue = 1; min_queue < 4 && ptable.queue_counts[min_queue]==0; min_queue++);
+
+    if (min_queue == 4){
+      release(&ptable.lock);
+      continue ;
+    }    
+
+    if(min_queue == 1){
+      mincpuproc = 0;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+
+        cprintf("%d:%d " , p->pid , p->queue_num);
+
+        if(p->queue_num == 1 && mincpuproc == 0)
+          mincpuproc = p;
+        else if (p->queue_num == 1 && p->rtime < mincpuproc->rtime)
+          mincpuproc = p;
+      }
+      p = mincpuproc;
+      ptable.queue_counts[p->queue_num]--;
+      cprintf("selected => %d:%d \n" , p->pid , p->queue_num);
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;      
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+      c->proc = 0;
+      release(&ptable.lock);
+      continue;
+    }
+
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;    
+      if(p -> queue_num != min_queue)
+        continue ;
+      for (q = 1; q < min_queue && ptable.queue_counts[q]==0; q++);
+      if(q < min_queue)
+        break;
+        
+      cprintf("%d:%d " , p->pid , p->queue_num);
+      cprintf("selected => %d:%d \n" , p->pid , p->queue_num);
+      ptable.queue_counts[p->queue_num]--;
+
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;      
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+  }
+}
+
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this
@@ -511,6 +627,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  update_queue_counts(&(myproc()->queue_num));
   sched();
   release(&ptable.lock);
 }
@@ -591,6 +708,7 @@ wakeup1(void *chan)
     if(p->state == SLEEPING && p->chan == chan){
       p->iotime += ticks - p->sleepstarttime;
       p->state = RUNNABLE;
+      update_queue_counts(&(p->queue_num));
     }
   // release(&tickslock);
 }
@@ -618,7 +736,10 @@ kill(int pid)
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
+      {
         p->state = RUNNABLE;
+        update_queue_counts(&(p->queue_num));
+      }
       release(&ptable.lock);
       return 0;
     }
