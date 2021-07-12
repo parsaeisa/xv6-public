@@ -90,7 +90,7 @@ found:
   p->pid = nextpid++;
 
   // acquire(&tickslock);
-  p->stime = ticks;
+  p->stime = ticks;  
   // release(&tickslock);
   p->etime = 0;
   p->rtime = 0;
@@ -272,6 +272,11 @@ exit(void)
   }
   // acquire(&tickslock);
   curproc->etime = ticks ;
+  // cprintf("pid:%d  stime:%d\n", curproc->pid, curproc->stime);
+  // cprintf("pid:%d  etime:%d\n", curproc->pid, curproc->etime);
+  // cprintf("pid:%d iotime:%d\n", curproc->pid, curproc->iotime);
+  // cprintf("pid:%d  rtime:%d\n", curproc->pid, curproc->rtime);
+  // cprintf("pid:%d  wtime:%d\n", curproc->pid, curproc->etime - curproc->stime - curproc->rtime);
   // release(&tickslock);
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
@@ -282,10 +287,39 @@ exit(void)
 int
 waitx(int *wtime, int *rtime)
 {
+  struct proc *p;
+  int havekids, pid;
   struct proc *curproc = myproc();
-  *wtime = curproc -> iotime ;
-  *rtime = curproc -> rtime ;
-  return 0;
+  
+  acquire(&ptable.lock);
+  for(;;){
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        *rtime = p->rtime ;
+        *wtime = p->etime - p->stime - p->rtime ;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+    sleep(curproc, &ptable.lock);
+  }
 }
 
 int
@@ -399,10 +433,12 @@ scheduler(void)
     minpriority = 101;
     sti();
     acquire(&ptable.lock);
-    // cprintf("xxx") ;
+    // cprintf("RUNNABLES:\n") ;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
+      // cprintf("pid:%d, priority:%d is RUNNABLE\n" , p->pid, p->priority) ;
+      cprintf("%d:%d " , p->pid, p->priority) ;
       if (p->priority < minpriority)     
       {         
         minpriority = p->priority ; 
@@ -422,7 +458,9 @@ scheduler(void)
       if(p -> priority != minpriority)
         continue ;
 
-      cprintf("pid:%d pri:%d has:%d chng:%d\n", p->pid, p->priority, p->hassamepriority, p->prioritychanged);
+      // cprintf("pid:%d pri:%d has:%d chng:%d\n", p->pid, p->priority, p->hassamepriority, p->prioritychanged);
+      // cprintf("selected=> pid:%d priority:%d\n", p->pid, p->priority);
+      cprintf("selected=> %d:%d\n", p->pid, p->priority);
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
