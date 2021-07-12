@@ -38,18 +38,37 @@ test(void)
   // }
   
   // childpid =
-   fork();
+  //part2 test//////////////////////////////////////////////
+  // fork();
+  // fork();
+  // cur_pid = getpid();
+  // set_priority(70);
+  // sleep(100);
+  // fork();
+  // sleep(100);
+  // set_priority(50);
+  // sleep(100);
+  // ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
+  // memset(ptr, 'a', (10000 + cur_pid) * cur_pid);
+  // while(waitx(&wtime, &rtime)!=-1);
+  //////////////////////////////////////////////////////////
+  //part3 test//////////////////////////////////////////////
   fork();
   fork();
   cur_pid = getpid();
-  set_priority(cur_pid % 101);
-
-  // printf(1,"shiiiit");
+  sleep(100);
+  fork();
+  sleep(100);
   ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
   memset(ptr, 'a', (10000 + cur_pid) * cur_pid);
+  while(waitx(&wtime, &rtime)!=-1);
+
+  // printf(1,"shiiiit");
+  // ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
+  // memset(ptr, 'a', (10000 + cur_pid) * cur_pid);
   // printf(1, " pid: %d\n", cur_pid);
   //while( wait()!=-1);
-  while( waitx( &wtime, &rtime)!=-1);
+  // while( waitx( &wtime, &rtime)!=-1);
   // printf(1, " pid: %d, wtime: %d, rtime: %d\n", cur_pid, wtime, rtime);
   
   // if (childpid > 0)

@@ -11,6 +11,7 @@ struct {
   struct spinlock lock;
   struct proc proc[NPROC];
   int queue_counts[4];
+  int newproccreated;
 } ptable;
 
 static struct proc *initproc;
@@ -28,6 +29,7 @@ pinit(void)
   acquire(&ptable.lock);
   for(int i = 0; i < 4; i++)
     ptable.queue_counts[i] = 0;
+  ptable.newproccreated = 0;
   release(&ptable.lock);
 }
 
@@ -131,15 +133,12 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
-  // acquire(&tickslock);
-  p->stime = ticks;  
-  // release(&tickslock);
+  p->stime = ticks;
   p->etime = 0;
   p->rtime = 0;
   p->iotime = 0;
   p->priority = 60;
-  p->hassamepriority = 0;
-  p->prioritychanged = 0;
+  p->preemption = 0;
   p->queue_num = 0;
 
 release(&ptable.lock);
@@ -202,6 +201,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  ptable.newproccreated = 1;
   update_queue_counts(&(p->queue_num));
 
   release(&ptable.lock);
@@ -269,6 +269,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  ptable.newproccreated = 1;
   update_queue_counts(&(np->queue_num)); 
 
   release(&ptable.lock);
@@ -370,9 +371,11 @@ waitx(int *wtime, int *rtime)
 int
 set_priority(int priority){
   struct proc *curproc = myproc();
+  acquire(&ptable.lock);
   int prev_priority = curproc->priority;
   curproc->priority = priority;
-  curproc->prioritychanged = 1;
+  curproc->preemption = 1;
+  release(&ptable.lock);
   return prev_priority;
 }
 
@@ -429,7 +432,7 @@ wait(void)
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
 void
-schedulermain(void)
+scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
@@ -466,11 +469,12 @@ schedulermain(void)
 
 
 void
-scheduler2(void)
+scheduler_part2(void)
 {
   struct proc *p;  
   int minpriority, hassamepriority;
   struct cpu *c = mycpu();
+  c->scheduler_part2 = 1;
   c->proc = 0;
 
   for(;;){
@@ -478,11 +482,10 @@ scheduler2(void)
     minpriority = 101;
     sti();
     acquire(&ptable.lock);
-    // cprintf("RUNNABLES:\n") ;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-      // cprintf("pid:%d, priority:%d is RUNNABLE\n" , p->pid, p->priority) ;
+
       cprintf("%d:%d " , p->pid, p->priority) ;
       if (p->priority < minpriority)     
       {         
@@ -492,9 +495,11 @@ scheduler2(void)
       else if (p->priority == minpriority)
         hassamepriority = 1;           
     }
-    
-    //if(minpriority < 101)
-      //cprintf("yyy %d " , minpriority) ;
+    if(minpriority==101){
+      release(&ptable.lock);
+      continue;
+    }
+    cprintf(" cpu: %p\n", c);
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     {
       if(p->state != RUNNABLE)
@@ -503,21 +508,21 @@ scheduler2(void)
       if(p -> priority != minpriority)
         continue ;
 
-      // cprintf("pid:%d pri:%d has:%d chng:%d\n", p->pid, p->priority, p->hassamepriority, p->prioritychanged);
-      // cprintf("selected=> pid:%d priority:%d\n", p->pid, p->priority);
-      cprintf("selected=> %d:%d\n", p->pid, p->priority);
+      cprintf("selected=> %d:%d  cpu: %p\n", p->pid, p->priority, c);
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      p->hassamepriority = hassamepriority;
+      p->preemption = hassamepriority;
       swtch(&(c->scheduler), p->context);
       switchkvm();
       c->proc = 0;
 
-      p->hassamepriority = 0;
-      p->prioritychanged = 0;
-      if(p -> priority < minpriority)
-        break ;
+      p->preemption = 0;
+      if(p -> priority < minpriority || (ptable.newproccreated == 1 && minpriority > 60)){
+        ptable.newproccreated = 0;
+        break;
+      }
+      ptable.newproccreated = 0;
     }
 
     release(&ptable.lock);
@@ -525,12 +530,13 @@ scheduler2(void)
 }
 
 void
-scheduler(void)
+scheduler_part3(void)
 {
   struct proc *p;  
   struct proc *mincpuproc;  
   int min_queue, q;
   struct cpu *c = mycpu();
+  c->scheduler_part2 = 0;
   c->proc = 0;
 
   for(;;){
@@ -543,23 +549,24 @@ scheduler(void)
       release(&ptable.lock);
       continue ;
     }    
-
+    cprintf("\nmin queue: %d cpu: %p\n", min_queue, c);
     if(min_queue == 1){
       mincpuproc = 0;
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
         if(p->state != RUNNABLE)
           continue;
 
-        cprintf("%d:%d " , p->pid , p->queue_num);
+        cprintf("%d:%d:%d  cpu: %p | " , p->pid , p->queue_num, p->rtime , c);
 
         if(p->queue_num == 1 && mincpuproc == 0)
           mincpuproc = p;
         else if (p->queue_num == 1 && p->rtime < mincpuproc->rtime)
           mincpuproc = p;
       }
+      // cprintf(" cpu: %p\n", c);
       p = mincpuproc;
       ptable.queue_counts[p->queue_num]--;
-      cprintf("selected => %d:%d \n" , p->pid , p->queue_num);
+      cprintf("selected => %d:%d:%d  cpu: %p\n" , p->pid , p->queue_num, p->rtime, c);
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;      
@@ -579,8 +586,8 @@ scheduler(void)
       if(q < min_queue)
         break;
         
-      cprintf("%d:%d " , p->pid , p->queue_num);
-      cprintf("selected => %d:%d \n" , p->pid , p->queue_num);
+      //cprintf("%d:%d " , p->pid , p->queue_num);
+      cprintf("selected => %d:%d  cpu: %p\n" , p->pid , p->queue_num, c);
       ptable.queue_counts[p->queue_num]--;
 
       c->proc = p;
