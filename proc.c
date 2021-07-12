@@ -48,8 +48,7 @@ void update_queue_counts(int *queue_num)
 
 void reset ()
 {
-  acquire(&ptable.lock);
-  cprintf("Priority queues reset.\n") ;
+  acquire(&ptable.lock);  
   struct proc *p;
   
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
