@@ -35,17 +35,10 @@ pinit(void)
 
 void update_queue_counts(int *queue_num)
 {
-  // if(*queue_num == 3)
-  //   *queue_num = 0;
-  // (*queue_num)++;
-  // ptable.queue_counts[*queue_num]++;
   if (*queue_num < 3)
     (*queue_num)++;
   
   ptable.queue_counts[*queue_num]++;
-    // if(*queue_num != 0)
-    //   ptable.queue_counts[*queue_num]--;
-    
 }
 
 void reset ()
@@ -484,9 +477,7 @@ scheduler_part2(void)
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
-        continue;
-
-      cprintf("%d:%d " , p->pid, p->priority) ;
+        continue;      
       if (p->priority < minpriority)     
       {         
         minpriority = p->priority ; 
@@ -499,16 +490,12 @@ scheduler_part2(void)
       release(&ptable.lock);
       continue;
     }
-    cprintf(" cpu: %p\n", c);
     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     {
       if(p->state != RUNNABLE)
         continue;    
-
       if(p -> priority != minpriority)
         continue ;
-
-      cprintf("selected=> %d:%d  cpu: %p\n", p->pid, p->priority, c);
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
@@ -524,7 +511,6 @@ scheduler_part2(void)
       }
       ptable.newproccreated = 0;
     }
-
     release(&ptable.lock);
   }
 }
@@ -548,15 +534,13 @@ scheduler_part3(void)
     if (min_queue == 4){
       release(&ptable.lock);
       continue ;
-    }    
-    cprintf("\nmin queue: %d cpu: %p\n", min_queue, c);
+    }      
     if(min_queue == 1){
       mincpuproc = 0;
       for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
         if(p->state != RUNNABLE)
           continue;
-
-        cprintf("%d:%d:%d  cpu: %p | " , p->pid , p->queue_num, p->rtime , c);
+        
 
         if(p->queue_num == 1 && mincpuproc == 0)
           mincpuproc = p;
@@ -565,8 +549,7 @@ scheduler_part3(void)
       }
       // cprintf(" cpu: %p\n", c);
       p = mincpuproc;
-      ptable.queue_counts[p->queue_num]--;
-      cprintf("selected => %d:%d:%d  cpu: %p\n" , p->pid , p->queue_num, p->rtime, c);
+      ptable.queue_counts[p->queue_num]--;      
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;      
@@ -585,9 +568,7 @@ scheduler_part3(void)
       for (q = 1; q < min_queue && ptable.queue_counts[q]==0; q++);
       if(q < min_queue)
         break;
-        
-      //cprintf("%d:%d " , p->pid , p->queue_num);
-      cprintf("selected => %d:%d  cpu: %p\n" , p->pid , p->queue_num, c);
+              
       ptable.queue_counts[p->queue_num]--;
 
       c->proc = p;

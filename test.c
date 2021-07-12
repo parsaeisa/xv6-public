@@ -5,39 +5,30 @@
 void
 test(void)
 {
-  int cur_pid;//, pid;  
-  char *ptr;
-  int wtime;
-  int rtime ;     
+  // int cur_pid;//, pid;  
+  // char *ptr;
+  
   //int  childpid ;
 
-  // pid = fork();
-  // if(pid==0){
-  //   // printf(1, " pid: %d, priority: %d\n", getpid(), set_priority(70));
-  //   pid = fork();
-  //   if(pid==0){
-  //     set_priority(10);
-  //     printf(1, " pid: %d, priority: %d\n", getpid(), 10);
-  //   }
-  //   else{
-  //     set_priority(20);
-  //     printf(1, " pid: %d, priority: %d\n", getpid(), 20);
-  //   }
+  //////////////////////////////////////////////////////////
+  //part 1 test//////////////////////////////////////////////
+  // int child_pid = fork();
+  // if(child_pid > 0){
+  //     int wtime;
+  //     int rtime ;     
+  //     printf(1,"parent proccess is running \n");      
+  //     while(waitx(&wtime, &rtime)!=-1);
+  //     printf(1,"wtime : %d  rtime : %d \n" , wtime, rtime);
   // }
-  // else{
-  //   // printf(1, " pid: %d, priority: %d\n", getpid(), set_priority(70));
-  //   pid = fork();
-  //   if(pid==0){
-  //     set_priority(10);
-  //     printf(1, " pid: %d, priority: %d\n", getpid(), 10);   
-  //   }
-  //   else{
-  //     set_priority(30);
-  //     printf(1, " pid: %d, priority: %d\n", getpid(), 30);      
-  //   }
-  // }
-  
-  // childpid =
+  // else
+  // {
+  //   int wtime;
+  //   int rtime ;     
+  //   sleep(100);
+  //   waitx( &wtime , &rtime) ;
+  //   printf(1,"wtime : %d  rtime : %d \n" , wtime, rtime);
+  // }  
+  /////////////////////////////////////////////////////////  
   //part2 test//////////////////////////////////////////////
   // fork();
   // fork();
@@ -53,15 +44,15 @@ test(void)
   // while(waitx(&wtime, &rtime)!=-1);
   //////////////////////////////////////////////////////////
   //part3 test//////////////////////////////////////////////
-  fork();
-  fork();
-  cur_pid = getpid();
-  sleep(100);
-  fork();
-  sleep(100);
-  ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
-  memset(ptr, 'a', (10000 + cur_pid) * cur_pid);
-  while(waitx(&wtime, &rtime)!=-1);
+  // fork();
+  // fork();
+  // cur_pid = getpid();
+  // sleep(100);
+  // fork();
+  // sleep(100);
+  // ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
+  // memset(ptr, 'a', (10000 + cur_pid) * cur_pid);
+  // while(waitx(&wtime, &rtime)!=-1);
 
   // printf(1,"shiiiit");
   // ptr = (char *)malloc(((10000 + cur_pid) * cur_pid) * sizeof(char));
@@ -90,6 +81,7 @@ test(void)
   //   waitx(&wtime, &rtime);
   //   // printf(1, " pid: %d, wtime: %d, rtime: %d\n", cur_pid, wtime, rtime);
   // }
+  //////////////////////////////////////////////////////////
 }
 
 int

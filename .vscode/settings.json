@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "user.h": "c",
-        "limits": "c"
+        "limits": "c",
+        "defs.h": "c"
     }
 }
